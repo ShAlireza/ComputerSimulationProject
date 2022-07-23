@@ -1,8 +1,43 @@
+from functools import partial, wraps
+
 import numpy as np
 import simpy
 
 
 RPS = 30
+
+
+def patch_resource(resource, pre=None, post=None):
+
+    def get_wrapper(func):
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if pre:
+                pre(resource)
+
+            ret = func(*args, **kwargs)
+
+            if post:
+                post(resource)
+
+            return ret
+        return wrapper
+
+    for name in ['put', 'get', 'request', 'release']:
+        if hasattr(resource, name):
+            setattr(resource, name, get_wrapper(getattr(resource, name)))
+
+
+def monitor(data, resource):
+
+    item = (
+        resource._env.now,
+        resource.count,
+        len(resource.queue)
+    )
+
+    data.append(item)
 
 
 class SnappFood:
@@ -18,13 +53,39 @@ class SnappFood:
         payment_count: int,
     ):
         self.env = env
-        self.api = simpy.Resource(env, api_count)
-        self.web = simpy.Resource(env, web_count)
-        self.res_manage = simpy.Resource(env, res_manage_count)
-        self.cus_manage = simpy.Resource(env, cus_manage_count)
-        self.ord_manage = simpy.Resource(env, ord_manage_count)
-        self.del_relation = simpy.Resource(env, del_relation_count)
-        self.payment = simpy.Resource(env, payment_count)
+        self.api_data = []
+        self.api = self._make_monitoring_resource(
+            simpy.Resource(env, api_count), self.api_data)
+
+        self.web_data = []
+        self.web = self._make_monitoring_resource(
+            simpy.Resource(env, web_count), self.web_data)
+
+        self.res_manage_data = []
+        self.res_manage = self._make_monitoring_resource(
+            simpy.Resource(env, res_manage_count), self.res_manage_data)
+
+        self.cus_manage_data = []
+        self.cus_manage = self._make_monitoring_resource(
+            simpy.Resource(env, cus_manage_count), self.cus_manage_data)
+
+        self.ord_manage_data = []
+        self.ord_manage = self._make_monitoring_resource(
+            simpy.Resource(env, ord_manage_count), self.ord_manage_data)
+
+        self.del_relation_data = []
+        self.del_relation = self._make_monitoring_resource(
+            simpy.Resource(env, del_relation_count), self.del_relation_data)
+
+        self.payment_data = []
+        self.payment = self._make_monitoring_resource(
+            simpy.Resource(env, payment_count), self.payment_data)
+
+    def _make_monitoring_resource(self, resource, data):
+        monitor_res = partial(monitor, data)
+        patch_resource(resource, post=monitor_res)
+
+        return resource
 
     def api_service(self, request, rate=2):
         yield self.env.timeout(
@@ -174,8 +235,6 @@ def run_snapp_food(
     request = 0
 
     while True:
-        yield env.timeout(1)
-
         for i in range(RPS):
             kind = np.random.uniform()
             if 0 <= kind < 0.2:
@@ -192,6 +251,8 @@ def run_snapp_food(
                 env.process(request_del(env, request, snapp_food))
             else:
                 env.process(follow_up_ord(env, request, snapp_food))
+
+        yield env.timeout(1)
 
 
 def main():
@@ -212,7 +273,7 @@ def main():
         payment_count
     ))
 
-    env.run(until=3600)
+    env.run(until=360)
 
 
 if __name__ == '__main__':
