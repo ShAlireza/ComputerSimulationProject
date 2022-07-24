@@ -1,6 +1,7 @@
 from functools import partial, wraps
 
 import numpy as np
+import matplotlib.pyplot as plt
 import simpy
 
 
@@ -218,20 +219,8 @@ def follow_up_ord(env, request, snapp_food: SnappFood):
 
 def run_snapp_food(
         env: simpy.Environment,
-        api_count: int,
-        web_count: int,
-        res_manage_count: int,
-        cus_manage_count: int,
-        ord_manage_count: int,
-        del_relation_count: int,
-        payment_count: int,
+        snapp_food: SnappFood,
 ):
-    snapp_food = SnappFood(
-        env, api_count, web_count,
-        res_manage_count, cus_manage_count,
-        ord_manage_count, del_relation_count,
-        payment_count
-    )
     request = 0
 
     while True:
@@ -266,14 +255,20 @@ def main():
     del_relation_count = 1
     payment_count = 1
 
-    env.process(run_snapp_food(
+    snapp_food = SnappFood(
         env, api_count, web_count,
         res_manage_count, cus_manage_count,
         ord_manage_count, del_relation_count,
         payment_count
+    )
+
+    env.process(run_snapp_food(
+        env, snapp_food
     ))
 
     env.run(until=360)
+
+    print(snapp_food.web_data)
 
 
 if __name__ == '__main__':
