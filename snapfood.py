@@ -8,6 +8,7 @@ from types import FunctionType
 RPS = 30
 TOTAL_TIME = 90
 TIME_DIVIDER = 60
+ENABLE_PRIORITY = True
 
 requests_usage_times = {}
 requests_total_times = {}
@@ -119,7 +120,7 @@ class SnappFood:
         return resource
 
     def api_service(self, request, rate=2, error_rate=0.01):
-        time = np.ceil(np.random.exponential(1/rate))
+        time = int(np.ceil(np.random.exponential(1/rate)))
 
         for t in range(time):
             if np.random.uniform() <= error_rate:
@@ -128,7 +129,7 @@ class SnappFood:
             yield self.env.timeout(1 / TIME_DIVIDER)
 
     def web_service(self, request, rate=3, error_rate=0.01):
-        time = np.ceil(np.random.exponential(1/rate))
+        time = int(np.ceil(np.random.exponential(1/rate)))
 
         for t in range(time):
             if np.random.uniform() <= error_rate:
@@ -137,7 +138,7 @@ class SnappFood:
             yield self.env.timeout(1 / TIME_DIVIDER)
 
     def res_manage_service(self, request, rate=8, error_rate=0.02):
-        time = np.ceil(np.random.exponential(1/rate))
+        time = int(np.ceil(np.random.exponential(1/rate)))
 
         for t in range(time):
             if np.random.uniform() <= error_rate:
@@ -146,7 +147,7 @@ class SnappFood:
             yield self.env.timeout(1 / TIME_DIVIDER)
 
     def cus_manage_service(self, request, rate=5, error_rate=0.02):
-        time = np.ceil(np.random.exponential(1/rate))
+        time = int(np.ceil(np.random.exponential(1/rate)))
 
         for t in range(time):
             if np.random.uniform() <= error_rate:
@@ -155,7 +156,7 @@ class SnappFood:
             yield self.env.timeout(1 / TIME_DIVIDER)
 
     def ord_manage_service(self, request, rate=6, error_rate=0.03):
-        time = np.ceil(np.random.exponential(1/rate))
+        time = int(np.ceil(np.random.exponential(1/rate)))
 
         for t in range(time):
             if np.random.uniform() <= error_rate:
@@ -164,7 +165,7 @@ class SnappFood:
             yield self.env.timeout(1 / TIME_DIVIDER)
 
     def del_relation_service(self, request, rate=9, error_rate=0.1):
-        time = np.ceil(np.random.exponential(1/rate))
+        time = int(np.ceil(np.random.exponential(1/rate)))
 
         for t in range(time):
             if np.random.uniform() <= error_rate:
@@ -173,7 +174,7 @@ class SnappFood:
             yield self.env.timeout(1 / TIME_DIVIDER)
 
     def payment_service(self, request, rate=12, error_rate=0.2):
-        time = np.ceil(np.random.exponential(1/rate))
+        time = int(np.ceil(np.random.exponential(1/rate)))
 
         for t in range(time):
             if np.random.uniform() <= error_rate:
@@ -190,17 +191,22 @@ def init():
     requests_usage_times = {}
     requests_total_times = {}
     requests = {}
-    for x in methods(SnappFood) + ['register_order_mobile',
-                                   'register_order_web',
-                                   'send_message_to_del',
-                                   'view_res_info_mobile',
-                                   'view_res_info_web',
-                                   'request_del',
-                                   'follow_up_ord'
-                                   ]:
+
+    flows = ['register_order_mobile',
+             'register_order_web',
+             'send_message_to_del',
+             'view_res_info_mobile',
+             'view_res_info_web',
+             'request_del',
+             'follow_up_ord'
+             ]
+    for x in methods(SnappFood):
         requests_total_times[x] = []
         requests_usage_times[x] = []
+
+    for x in flows:
         requests[x] = []
+        requests_total_times[x] = []
 
 
 def register_order_mobile(env: simpy.Environment, request, snapp_food: SnappFood):
@@ -210,7 +216,7 @@ def register_order_mobile(env: simpy.Environment, request, snapp_food: SnappFood
 
     requests['register_order_mobile'].append(request)
 
-    with snapp_food.payment.request(priority=1, preempt=False) as req:
+    with snapp_food.payment.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.payment_service(request))
@@ -223,7 +229,7 @@ def register_order_mobile(env: simpy.Environment, request, snapp_food: SnappFood
     requests_total_times['payment_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.ord_manage.request(priority=1, preempt=False) as req:
+    with snapp_food.ord_manage.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.ord_manage_service(request))
@@ -236,7 +242,7 @@ def register_order_mobile(env: simpy.Environment, request, snapp_food: SnappFood
     requests_total_times['ord_manage_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.api.request(priority=1, preempt=False) as req:
+    with snapp_food.api.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.api_service(request))
@@ -258,7 +264,7 @@ def register_order_web(env: simpy.Environment, request, snapp_food: SnappFood):
     start_time = env.now
     requests['register_order_web'].append(request)
 
-    with snapp_food.payment.request(priority=1, preempt=False) as req:
+    with snapp_food.payment.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.payment_service(request))
@@ -271,7 +277,7 @@ def register_order_web(env: simpy.Environment, request, snapp_food: SnappFood):
     requests_total_times['payment_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.ord_manage.request(priority=1, preempt=False) as req:
+    with snapp_food.ord_manage.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.ord_manage_service(request))
@@ -284,7 +290,7 @@ def register_order_web(env: simpy.Environment, request, snapp_food: SnappFood):
     requests_total_times['ord_manage_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.web.request(priority=1, preempt=False) as req:
+    with snapp_food.web.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.web_service(request))
@@ -305,7 +311,7 @@ def send_message_to_del(env: simpy.Environment, request, snapp_food: SnappFood):
     request_start_time = env.now
     start_time = env.now
     requests['send_message_to_del'].append(request)
-    with snapp_food.del_relation.request(priority=2, preempt=False) as req:
+    with snapp_food.del_relation.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.del_relation_service(request))
@@ -318,7 +324,7 @@ def send_message_to_del(env: simpy.Environment, request, snapp_food: SnappFood):
     requests_total_times['del_relation_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.cus_manage.request(priority=2, preempt=False) as req:
+    with snapp_food.cus_manage.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.cus_manage_service(request))
@@ -331,7 +337,7 @@ def send_message_to_del(env: simpy.Environment, request, snapp_food: SnappFood):
     requests_total_times['cus_manage_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.api.request(priority=2, preempt=False) as req:
+    with snapp_food.api.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.api_service(request))
@@ -352,7 +358,7 @@ def view_res_info_mobile(env, request, snapp_food: SnappFood):
     request_start_time = env.now
     start_time = env.now
     requests['view_res_info_mobile'].append(request)
-    with snapp_food.res_manage.request(priority=2, preempt=False) as req:
+    with snapp_food.res_manage.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.res_manage_service(request))
@@ -365,7 +371,7 @@ def view_res_info_mobile(env, request, snapp_food: SnappFood):
     requests_total_times['res_manage_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.api.request(priority=2, preempt=False) as req:
+    with snapp_food.api.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.api_service(request))
@@ -386,7 +392,7 @@ def view_res_info_web(env, request, snapp_food: SnappFood):
     request_start_time = env.now
     start_time = env.now
     requests['view_res_info_web'].append(request)
-    with snapp_food.res_manage.request(priority=2, preempt=False) as req:
+    with snapp_food.res_manage.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.res_manage_service(request))
@@ -399,7 +405,7 @@ def view_res_info_web(env, request, snapp_food: SnappFood):
     requests_total_times['res_manage_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.web.request(priority=2, preempt=False) as req:
+    with snapp_food.web.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.web_service(request))
@@ -420,7 +426,7 @@ def request_del(env, request, snapp_food: SnappFood):
     request_start_time = env.now
     start_time = env.now
     requests['request_del'].append(request)
-    with snapp_food.del_relation.request(priority=1, preempt=False) as req:
+    with snapp_food.del_relation.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.del_relation_service(request))
@@ -433,7 +439,7 @@ def request_del(env, request, snapp_food: SnappFood):
     requests_total_times['del_relation_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.res_manage.request(priority=1, preempt=False) as req:
+    with snapp_food.res_manage.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.res_manage_service(request))
@@ -446,7 +452,7 @@ def request_del(env, request, snapp_food: SnappFood):
     requests_total_times['res_manage_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.web.request(priority=1, preempt=False) as req:
+    with snapp_food.web.request(priority=1 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.web_service(request))
@@ -467,7 +473,7 @@ def follow_up_ord(env, request, snapp_food: SnappFood):
     request_start_time = env.now
     start_time = env.now
     requests['follow_up_ord'].append(request)
-    with snapp_food.ord_manage.request(priority=2, preempt=False) as req:
+    with snapp_food.ord_manage.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.ord_manage_service(request))
@@ -480,7 +486,7 @@ def follow_up_ord(env, request, snapp_food: SnappFood):
     requests_total_times['ord_manage_service'].append(env.now - start_time)
 
     start_time = env.now
-    with snapp_food.api.request(priority=2, preempt=False) as req:
+    with snapp_food.api.request(priority=2 if ENABLE_PRIORITY else 0, preempt=False) as req:
         yield req
         service_start_time = env.now
         yield env.process(snapp_food.api_service(request))
@@ -591,6 +597,7 @@ def main(
     ord_manage_count: int = 1,
     del_relation_count: int = 1,
     payment_count: int = 1,
+    priority: bool = False
 ):
 
     init()
@@ -600,6 +607,9 @@ def main(
 
     global RPS
     RPS = rps
+
+    global ENABLE_PRIORITY
+    ENABLE_PRIORITY = priority
 
     env = simpy.Environment()
 
@@ -656,6 +666,16 @@ def Q3(snapp_food: SnappFood):
         utilization = np.sum(y) / TOTAL_TIME
         if utilization > 0.001:
             print(utilization)
+
+
+def failure_percentage(snapp_food: SnappFood):
+    for k, reqs in requests.items():
+        failed = 0
+        print(f"{k}:{len(requests)}")
+        for req in reqs:
+            if req.error:
+                failed += 1
+        print(f"failure percentage: {k}: {failed / len(reqs)}")
 
 
 def answer_all_qeustions(snapp_food: SnappFood):
